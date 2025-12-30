@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import "./dashboard.css";
 import Dashboard from "./pages/Dashboard.jsx";
 import Customers from "./pages/Customers.jsx";
@@ -8,6 +8,19 @@ import Reports from "./pages/Reports.jsx";
 export default function App() {
   const [activeTab, setActiveTab] = useState("Dashboard");
   const [topSearch, setTopSearch] = useState("");
+  const [theme, setTheme] = useState(() => {
+    if (typeof window === "undefined") return "light";
+    const stored = window.localStorage.getItem("theme");
+    if (stored === "light" || stored === "dark") return stored;
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  });
+
+  useEffect(() => {
+    const next = theme === "dark" ? "theme-dark" : "theme-light";
+    document.body.classList.remove("theme-dark", "theme-light");
+    document.body.classList.add(next);
+    window.localStorage.setItem("theme", theme);
+  }, [theme]);
 
   return (
     <div className="shell">
@@ -37,6 +50,13 @@ export default function App() {
               <span className="mutedSmall">Use Customers tab to add/edit customers.</span>
             )}
           </div>
+          <button
+            className="btn btn--ghost"
+            aria-pressed={theme === "dark"}
+            onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+          >
+            {theme === "dark" ? "Light mode" : "Dark mode"}
+          </button>
         </div>
       </header>
 

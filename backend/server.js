@@ -58,6 +58,28 @@ db.exec(`
   );
 `);
 
+// Ensure required columns exist for older DB files (idempotent migrations)
+function ensureColumn(table, column, definition, defaultValue) {
+  const hasColumn = db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === column);
+  if (!hasColumn) {
+    db.prepare(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`).run();
+    if (defaultValue !== undefined) {
+      db.prepare(`UPDATE ${table} SET ${column} = ? WHERE ${column} IS NULL OR ${column} = ''`).run(defaultValue);
+    }
+  }
+}
+
+ensureColumn("cases", "status", "TEXT DEFAULT 'Open'", "Open");
+
+function nextCustomerId() {
+  // Use both sqlite_sequence (id auto-increment) and existing customer_id values to pick the next number
+  const seqRow = db.prepare("SELECT seq FROM sqlite_sequence WHERE name='customers'").get();
+  const nextFromSeq = seqRow && typeof seqRow.seq === "number" ? seqRow.seq + 1 : 1;
+  const maxRow = db.prepare("SELECT MAX(CAST(customer_id AS INTEGER)) as maxId FROM customers").get();
+  const nextFromData = maxRow && typeof maxRow.maxId === "number" ? (maxRow.maxId || 0) + 1 : 1;
+  return String(Math.max(nextFromSeq || 1, nextFromData || 1));
+}
+
 // ---------- Helpers ----------
 function nowISO() {
   return new Date().toISOString();
@@ -296,7 +318,9 @@ app.post("/api/customers", (req, res) => {
     status = "Active", segment = "", owner = "", notes = ""
   } = req.body || {};
 
-  if (!customer_id || !name) return res.status(400).json({ error: "customer_id and name required" });
+  if (!name) return res.status(400).json({ error: "name required" });
+
+  const assignedCustomerId = (customer_id || "").toString().trim() || nextCustomerId();
 
   const created_at = nowISO();
   const updated_at = created_at;
@@ -305,7 +329,7 @@ app.post("/api/customers", (req, res) => {
     const info = db.prepare(
       `INSERT INTO customers (customer_id, name, contact_person, email, phone, status, segment, owner, notes, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(customer_id, name, contact_person || "", email || "", phone || "", status, segment, owner, notes, created_at, updated_at);
+    ).run(assignedCustomerId, name, contact_person || "", email || "", phone || "", status, segment, owner, notes, created_at, updated_at);
 
     const row = db.prepare("SELECT * FROM customers WHERE id=?").get(info.lastInsertRowid);
     res.status(201).json(row);

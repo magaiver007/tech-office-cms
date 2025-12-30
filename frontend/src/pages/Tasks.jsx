@@ -24,14 +24,45 @@ function toDateSafe(iso) {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
+function CalendarToolbar({ label, onNavigate, onView, view, views }) {
+  return (
+    <div className="rbc-toolbar customToolbar">
+      <div className="toolbarNav">
+        <button type="button" className="iconBtn" aria-label="Previous" onClick={() => onNavigate("PREV")}>
+          ←
+        </button>
+        <div className="toolbarLabel">{label}</div>
+        <button type="button" className="iconBtn" aria-label="Next" onClick={() => onNavigate("NEXT")}>
+          →
+        </button>
+      </div>
+      <div className="toolbarViews">
+        {(views || ["month", "week", "day"]).map((v) => (
+          <button
+            key={v}
+            type="button"
+            className={`btn btn--ghost ${view === v ? "toolbarBtn--active" : ""}`}
+            aria-pressed={view === v}
+            onClick={() => onView(v)}
+          >
+            {v[0].toUpperCase() + v.slice(1)}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function Tasks() {
   const [tasks, setTasks] = useState([]);
   const [cases, setCases] = useState([]);
   const [err, setErr] = useState("");
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState("add");
   const [formErr, setFormErr] = useState("");
   const [draft, setDraft] = useState({
+    id: null,
     title: "",
     start_iso: "",
     end_iso: "",
@@ -58,6 +89,7 @@ export default function Tasks() {
         title: `Task: ${t.title}`,
         start: toDateSafe(t.start_iso),
         end: toDateSafe(t.end_iso),
+        className: "taskEvent",
         resource: { type: "task", raw: t }
       }))
       .filter((e) => e.start && e.end);
@@ -73,6 +105,7 @@ export default function Tasks() {
           title: `Pending: ${c.case_number} - ${c.client_name}`,
           start,
           end,
+          className: "caseEvent",
           resource: { type: "case", raw: c }
         };
       })
@@ -81,13 +114,13 @@ export default function Tasks() {
     return [...taskEvents, ...pendingCaseEvents];
   }, [tasks, cases]);
 
-  function onSelectSlot(slot) {
-    // slot.start/slot.end are Dates from calendar selection
-    const start = slot.start;
-    const end = slot.end;
-
+  function openNewTask(slot) {
+    const start = slot?.start || new Date();
+    const end = slot?.end || new Date(start.getTime() + 60 * 60 * 1000);
     setFormErr("");
+    setModalMode("add");
     setDraft({
+      id: null,
       title: "",
       start_iso: start.toISOString(),
       end_iso: end.toISOString(),
@@ -96,17 +129,60 @@ export default function Tasks() {
     setIsModalOpen(true);
   }
 
+  function openEditTask(task) {
+    if (!task) return;
+    setFormErr("");
+    setModalMode("edit");
+    setDraft({
+      id: task.id,
+      title: task.title || "",
+      start_iso: task.start_iso || "",
+      end_iso: task.end_iso || "",
+      notes: task.notes || ""
+    });
+    setIsModalOpen(true);
+  }
+
+  function onSelectSlot(slot) {
+    openNewTask(slot);
+  }
+
   async function saveTask() {
     setFormErr("");
     try {
       if (!draft.title.trim()) return setFormErr("Title is required.");
       if (!draft.start_iso || !draft.end_iso) return setFormErr("Start and end are required.");
 
-      await api("/api/tasks", { method: "POST", body: draft });
+      if (draft.id) {
+        await api(`/api/tasks/${draft.id}`, { method: "PUT", body: draft });
+      } else {
+        await api("/api/tasks", { method: "POST", body: draft });
+      }
       setIsModalOpen(false);
       await load();
     } catch (e) {
       setFormErr(e.message);
+    }
+  }
+
+  function onSelectEvent(event) {
+    if (event?.resource?.type === "task") {
+      openEditTask(event.resource.raw);
+    } else if (event?.resource?.type === "case") {
+      // prefill a task for the case so the user can quickly schedule it
+      const c = event.resource.raw;
+      const start = event.start || new Date();
+      const end = event.end || new Date(start.getTime() + 60 * 60 * 1000);
+      setFormErr("");
+      setModalMode("add");
+      setDraft({
+        id: null,
+        title: `Case ${c.case_number} - ${c.client_name}`,
+        start_iso: start.toISOString(),
+        end_iso: end.toISOString(),
+        notes: c.notes || ""
+      });
+      setIsModalOpen(true);
     }
   }
 
@@ -120,7 +196,7 @@ export default function Tasks() {
         </div>
 
         <div style={{ padding: 12, display: "grid", gap: 10 }}>
-          <button className="btn btn--primary" onClick={() => setIsModalOpen(true)}>Add Task</button>
+          <button className="btn btn--primary" onClick={() => openNewTask()}>Add Task</button>
           <div className="mutedSmall">
             Tip: drag on the calendar to create a task time block.
           </div>
@@ -138,7 +214,7 @@ export default function Tasks() {
           <div className="card__header">
             <div className="card__title">Calendar</div>
             <div className="card__tools">
-              <IconBtn title="Add Task" onClick={() => setIsModalOpen(true)}>＋</IconBtn>
+              <IconBtn title="Add Task" onClick={() => openNewTask()}>＋</IconBtn>
             </div>
           </div>
 
@@ -149,7 +225,11 @@ export default function Tasks() {
               startAccessor="start"
               endAccessor="end"
               selectable
+              popup
+              views={["month", "week", "day"]}
               onSelectSlot={onSelectSlot}
+              onSelectEvent={onSelectEvent}
+              components={{ toolbar: CalendarToolbar }}
               style={{ height: "100%" }}
             />
           </div>
@@ -192,7 +272,7 @@ export default function Tasks() {
 
       {/* Add Task modal */}
       {isModalOpen && (
-        <Modal title="Add Task" onClose={() => setIsModalOpen(false)}>
+        <Modal title={modalMode === "edit" ? "Edit Task" : "Add Task"} onClose={() => setIsModalOpen(false)}>
           <form className="form" onSubmit={(e) => { e.preventDefault(); saveTask(); }}>
             <FormRow label="Title">
               <input value={draft.title} onChange={(e) => setDraft((s) => ({ ...s, title: e.target.value }))} />
@@ -228,7 +308,7 @@ export default function Tasks() {
 
             <div className="modalActions">
               <button type="button" className="btn" onClick={() => setIsModalOpen(false)}>Cancel</button>
-              <button type="submit" className="btn btn--primary">Save</button>
+              <button type="submit" className="btn btn--primary">{modalMode === "edit" ? "Update Task" : "Save Task"}</button>
             </div>
           </form>
         </Modal>

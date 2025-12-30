@@ -42,7 +42,7 @@ export function Modal({ title, onClose, children }) {
         <div className="modalHeader">
           <div className="modalTitle">{title}</div>
           <button className="iconBtn" onClick={onClose} aria-label="Close">
-            ×
+            x
           </button>
         </div>
         <div className="modalBody">{children}</div>
