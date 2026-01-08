@@ -1,8 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api.js";
 import { DetailRow, ErrorBox, IconBtn, LoadingLine, Modal, FormRow, Pill } from "../ui/components.jsx";
 
-export default function Customers({ topSearch }) {
+export default function Customers() {
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const topSearch = searchParams.get('q') || '';
   const [rows, setRows] = useState([]);
   const [err, setErr] = useState("");
   const [selectedId, setSelectedId] = useState(null);
@@ -30,6 +34,16 @@ export default function Customers({ topSearch }) {
   }
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [topSearch]);
+  useEffect(() => {
+    if (searchParams.get('create') === 'true') {
+      open(null);
+      // Clear the create param after opening
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete('create');
+      setSearchParams(newParams, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams.get('create')]);
 
   function open(cust) {
     setFormErr("");

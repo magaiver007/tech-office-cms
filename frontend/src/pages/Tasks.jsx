@@ -86,7 +86,7 @@ export default function Tasks() {
     const taskEvents = tasks
       .map((t) => ({
         id: `task-${t.id}`,
-        title: `Task: ${t.title}`,
+        title: t.title,
         start: toDateSafe(t.start_iso),
         end: toDateSafe(t.end_iso),
         className: "taskEvent",
@@ -188,34 +188,11 @@ export default function Tasks() {
 
   return (
     <main className="grid tasksGrid">
-      {/* Left: controls */}
-      <section className="panel panel--left">
-        <div className="panel__header">
-          <div className="panel__title">Tasks</div>
-          <IconBtn title="Refresh" onClick={load}>↻</IconBtn>
-        </div>
-
-        <div style={{ padding: 12, display: "grid", gap: 10 }}>
-          <button className="btn btn--primary" onClick={() => openNewTask()}>Add Task</button>
-          <div className="mutedSmall">
-            Tip: drag on the calendar to create a task time block.
-          </div>
-          <div className="mutedSmall">
-            Pending cases appear on their <b>due_date</b>.
-          </div>
-        </div>
-
-        {err && <ErrorBox error={err} />}
-      </section>
-
       {/* Middle: calendar */}
       <section className="panel panel--mid tasksMid">
         <div className="card" style={{ height: "100%" }}>
           <div className="card__header">
             <div className="card__title">Calendar</div>
-            <div className="card__tools">
-              <IconBtn title="Add Task" onClick={() => openNewTask()}>＋</IconBtn>
-            </div>
           </div>
 
           <div className="calendarWrap">
@@ -236,10 +213,16 @@ export default function Tasks() {
         </div>
       </section>
 
+      
       {/* Right: list */}
       <aside className="panel panel--right">
         <div className="details">
           <div className="details__title">Upcoming</div>
+          <div style={{ margin: "6px 0 10px" }}>
+            <button className="btn btn--primary" onClick={() => openNewTask()}>Add Task</button>
+          </div>
+
+          {err && <ErrorBox error={err} />}
 
           <div className="mutedSmall" style={{ marginBottom: 8 }}>Tasks</div>
           <div className="miniList">
@@ -259,7 +242,7 @@ export default function Tasks() {
               .slice(0, 12)
               .map((c) => (
                 <div className="miniRow" key={c.id}>
-                  <div className="miniTitle">{c.case_number} — {c.client_name}</div>
+                  <div className="miniTitle">{c.case_number} - {c.client_name}</div>
                   <div className="miniMeta">Due: {c.due_date}</div>
                 </div>
               ))}

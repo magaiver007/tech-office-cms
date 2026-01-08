@@ -1,8 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api.js";
 import { ErrorBox, IconBtn, KpiCard, LoadingLine, Pill, DetailRow, Modal, FormRow } from "../ui/components.jsx";
 
-export default function Dashboard({ topSearch }) {
+export default function Dashboard() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const topSearch = searchParams.get('q') || '';
   const [metrics, setMetrics] = useState(null);
 
   const [cases, setCases] = useState([]);
@@ -135,7 +139,11 @@ export default function Dashboard({ topSearch }) {
 
         <div className="caseList">
           {cases.map((c) => (
-            <div key={c.id} className="caseRow">
+            <div
+              key={c.id}
+              className="caseRow caseRow--click"
+              onClick={() => navigate(`/cases/${c.id}`)}
+            >
               <span className={`dot ${c.status === "Completed" ? "dot--lead" : "dot--active"}`} />
               <div className="caseRow__text">
                 <div className="caseRow__id">{c.case_number}</div>
@@ -183,6 +191,7 @@ export default function Dashboard({ topSearch }) {
                     key={c.id}
                     className={c.id === selectedCustomerId ? "row--active" : ""}
                     onClick={() => setSelectedCustomerId(c.id)}
+                    onDoubleClick={() => navigate(`/customers/${c.id}`)}
                   >
                     <td className="mono">{c.customer_id}</td>
                     <td>{c.name}</td>
@@ -237,6 +246,9 @@ export default function Dashboard({ topSearch }) {
               <div style={{ marginTop: 12, display: "flex", gap: 10 }}>
                 <button className="btn" onClick={() => openEditCustomer(selectedCustomer)}>Edit</button>
                 <button className="btn btn--primary" onClick={() => openEditCustomer(null)}>Add</button>
+                <button className="btn btn--ghost" onClick={() => navigate(`/customers/${selectedCustomer.id}`)}>
+                  Open Profile
+                </button>
               </div>
             </>
           )}
